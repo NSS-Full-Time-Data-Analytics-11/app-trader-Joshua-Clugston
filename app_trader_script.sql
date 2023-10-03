@@ -1,16 +1,10 @@
 -- 1.
 SELECT *
-FROM app_store_apps
-ORDER BY size_bytes::numeric;
+FROM app_store_apps;
 
 SELECT *
 FROM play_store_apps;
 
-SELECT genres, COUNT(name) AS num
-FROM play_store_apps
-WHERE category = 'GAME'
-GROUP BY genres
-ORDER BY num DESC;
 
 
 
@@ -61,12 +55,12 @@ all_apps_data AS (
 		   CASE WHEN category = 'REFERENCE' THEN 'BOOKS AND REFERENCE'
 				ELSE category END AS category,
 		   CASE WHEN content_rating LIKE '%17%' THEN '17+'
-		 		 ELSE content_rating END AS content_rating,
+		 		ELSE content_rating END AS content_rating,
 		   size, 
-			CASE WHEN size LIKE '%G' THEN ROUND(size_bytes::numeric*1000000000,0)
-				 WHEN size LIKE '%M' THEN ROUND(size_bytes::numeric*1000000   ,0)
-				 WHEN size LIKE '%k' THEN ROUND(size_bytes::numeric*1000      ,0)
-				 ELSE size_bytes::numeric END AS size_bytes,
+		   CASE WHEN size LIKE '%G' THEN ROUND(size_bytes::numeric*1000000000,0)
+				WHEN size LIKE '%M' THEN ROUND(size_bytes::numeric*1000000   ,0)
+				WHEN size LIKE '%k' THEN ROUND(size_bytes::numeric*1000      ,0)
+				ELSE size_bytes::numeric END AS size_bytes,
 		   'Android' AS store
 	FROM play_store_apps INNER JOIN size_in_bytes USING (name)
 	UNION
@@ -114,7 +108,7 @@ FROM distinct_apps_data
 WHERE category IS NOT NULL
 GROUP BY category
 ORDER BY avg_rating DESC, avg_reviews DESC;
-*/
+
 
 SELECT size_range, COUNT(name), ROUND(AVG(avg_rating)/25,2)*25 AS avg_rating
 FROM (SELECT name, size, avg_rating,
@@ -133,6 +127,15 @@ GROUP BY size_range
 ORDER BY avg_rating DESC;
 
 
+SELECT content_rating, ROUND(AVG(avg_rating)/25,2)*25 AS avg_rating, 
+	   AVG(avg_reviews)::INT AS review_count, COUNT(name) AS tot_apps,
+	   (AVG(avg_reviews)/ COUNT(name))::INT AS review_per_app
+FROM distinct_apps_data
+GROUP BY content_rating
+HAVING COUNT(name) > 100
+ORDER BY avg_rating DESC, review_per_app DESC;
+*/
+
 -- The CTEs in this are fairly convoluted, but a lot of is cleaning and organzing data so that everything is normalized
 -- and condensed as much as possible (especially with the case statement for category haha).
 
@@ -143,6 +146,26 @@ ORDER BY avg_rating DESC;
 -- there is one. All the sizes score either 3.75 or 4.00 if they're known while unknown only scores a 4.25... with the exception
 -- of the 'Very Small' category. There is exactly one app small enough to be in this category, so I have decided to leave it out
 -- of analysis.
+
+-- The third query is rating based on content rating. Now, there are two different kinds of ratings being reported: 
+-- There is the ESRB rating system of E, E10, T, M, and AO as well as the App Store's unique rating of
+-- 4+, 9+, 12+, and 17+. I removed AO from the list because there are only 3 apps (not enought to make conclusive claims) and there
+-- are no M ratings. However, there is still a trend: E10 and 9+ are the top of their respective systems, followed by T and 12+,
+-- then by E and 4+. However, the ESRB ratings are all above the App store's rating, so I would encourage App Trader to invest
+-- in apps rated by the ESRB (that is, ratings of E, E10, T, M, and AO), then followed by the priority of E10 and Teen since
+-- they generally score better.
+-- With this in mind, it can be interpreted that the Play Store may have better rated games than the App Store.
+-- I've used the followed to investigate that:
+
+SELECT AVG(rating)
+FROM app_store_apps;
+
+SELECT AVG(rating)
+FROM play_store_apps;
+
+-- Play Store typically score higher than the App Store by the average, so seeing that the ESRB rating score higher makes sense
+-- because the Play Store uses ESRB ratings while the App Store doesn't.
+
 
 
 
@@ -172,10 +195,9 @@ GROUP BY name
 ORDER BY rounded_rating DESC NULLS LAST, avg_review_count DESC
 LIMIT 10;
 
-
 -- *** The price of each app is no more than $2.50 because this means that each app will cost the minimum price for payment.
 --			While there may be other great apps that cost more, this list contains the best for a lower down payment.
---	   All of the apps on this list appear in both stores, meaning that marketing costs are also reduced. ***
+--	   All of the apps on this list appear in both stores, meaning that marketing costs are optimized. ***
 
 
 
@@ -195,12 +217,12 @@ all_apps_data AS (
 		   CASE WHEN category = 'REFERENCE' THEN 'BOOKS AND REFERENCE'
 				ELSE category END AS category,
 		   CASE WHEN content_rating LIKE '%17%' THEN '17+'
-		 		 ELSE content_rating END AS content_rating,
+		 		ELSE content_rating END AS content_rating,
 		   size, 
-			CASE WHEN size LIKE '%G' THEN ROUND(size_bytes::numeric*1000000000,0)
-				 WHEN size LIKE '%M' THEN ROUND(size_bytes::numeric*1000000   ,0)
-				 WHEN size LIKE '%k' THEN ROUND(size_bytes::numeric*1000      ,0)
-				 ELSE size_bytes::numeric END AS size_bytes,
+		   CASE WHEN size LIKE '%G' THEN ROUND(size_bytes::numeric*1000000000,0)
+				WHEN size LIKE '%M' THEN ROUND(size_bytes::numeric*1000000   ,0)
+				WHEN size LIKE '%k' THEN ROUND(size_bytes::numeric*1000      ,0)
+				ELSE size_bytes::numeric END AS size_bytes,
 		   'Android' AS store
 	FROM play_store_apps INNER JOIN size_in_bytes USING (name)
 	UNION
@@ -242,6 +264,7 @@ distinct_apps_data AS (
 	FROM distinct_apps LEFT JOIN all_apps_data USING(name, price)
 	GROUP BY name)
 	
+
 SELECT *
 FROM distinct_apps_data
 WHERE (name ILIKE '%halloween%' OR name ILIKE '%ghost%' OR name ILIKE '%pumpkin%') AND avg_reviews > 100
@@ -249,10 +272,9 @@ ORDER BY avg_rating DESC, avg_reviews DESC
 LIMIT 4;
 
 
+
+
 -- c. Submit a report based on your findings. The report should include both of your lists of apps along with your analysis of 
 -- their cost and potential profits. All analysis work must be done using PostgreSQL, however you may export query results to 
 -- create charts in Excel for your report.
-
-
-
 
